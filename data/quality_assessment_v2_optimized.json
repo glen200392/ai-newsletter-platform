@@ -1,0 +1,77 @@
+{
+  "assessment_date": "2026-02-04T15:03:27.135196",
+  "version": "v2_optimized",
+  "average_scores": {
+    "total_score": 4.5,
+    "ceo_perspective": 4.5,
+    "avg_word_count": 1090.0,
+    "avg_action_items": 4.0
+  },
+  "detailed_scores": {
+    "newsletter_1": {
+      "theme": "Strategic Intelligence: AI Transforming Healthcare",
+      "accuracy": 3.5,
+      "ceo_perspective": 4.5,
+      "readability": 4.5,
+      "business_value": 5.0,
+      "data_support": 5.0,
+      "total_score": 4.5,
+      "word_count": 892,
+      "source_count": 0,
+      "actionable_items": 4,
+      "data_points": 70
+    },
+    "newsletter_2": {
+      "theme": "Technology Radar: Quantum Computing Goes Mainstream",
+      "accuracy": 3.5,
+      "ceo_perspective": 4.5,
+      "readability": 4.5,
+      "business_value": 5.0,
+      "data_support": 5.0,
+      "total_score": 4.5,
+      "word_count": 1047,
+      "source_count": 0,
+      "actionable_items": 4,
+      "data_points": 127
+    },
+    "newsletter_3": {
+      "theme": "Market Pulse: ESG Reporting Becomes Mandatory",
+      "accuracy": 3.5,
+      "ceo_perspective": 4.5,
+      "readability": 4.5,
+      "business_value": 5.0,
+      "data_support": 5.0,
+      "total_score": 4.5,
+      "word_count": 1089,
+      "source_count": 0,
+      "actionable_items": 4,
+      "data_points": 92
+    },
+    "newsletter_4": {
+      "theme": "Leadership Insights: The Remote Work Reckoning",
+      "accuracy": 3.5,
+      "ceo_perspective": 4.5,
+      "readability": 4.5,
+      "business_value": 5.0,
+      "data_support": 5.0,
+      "total_score": 4.5,
+      "word_count": 1242,
+      "source_count": 0,
+      "actionable_items": 4,
+      "data_points": 127
+    },
+    "newsletter_5": {
+      "theme": "Talent & Culture: Gen Z Enters Leadership",
+      "accuracy": 3.5,
+      "ceo_perspective": 4.5,
+      "readability": 4.5,
+      "business_value": 5.0,
+      "data_support": 5.0,
+      "total_score": 4.5,
+      "word_count": 1178,
+      "source_count": 0,
+      "actionable_items": 4,
+      "data_points": 111
+    }
+  }
+}
