@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: strategic-orchestrator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: strategic-orchestrator
+  template:
+    metadata:
+      labels:
+        app: strategic-orchestrator
+    spec:
+      containers:
+      - name: strategic
+        image: newsletter-strategic:latest
+        ports:
+        - containerPort: 8001
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: newsletter-secrets
+              key: database-url
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: strategic-service
+spec:
+  selector:
+    app: strategic-orchestrator
+  ports:
+  - port: 8001
+    targetPort: 8001
+  type: LoadBalancer
