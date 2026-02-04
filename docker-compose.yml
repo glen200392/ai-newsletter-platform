@@ -1,0 +1,212 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: newsletter-postgres
+    environment:
+      POSTGRES_USER: newsletter
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: newsletter_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newsletter"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: newsletter-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # RabbitMQ Message Queue
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: newsletter-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Temporal Server
+  temporal:
+    image: temporalio/auto-setup:1.22.4
+    container_name: newsletter-temporal
+    depends_on:
+      - postgres
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=newsletter
+      - POSTGRES_PWD=password
+      - POSTGRES_SEEDS=postgres
+    ports:
+      - "7233:7233"
+    volumes:
+      - temporal_data:/etc/temporal
+
+  # Strategic Orchestrator (Layer 1)
+  strategic-orchestrator:
+    build:
+      context: .
+      dockerfile: docker/strategic/Dockerfile
+    container_name: newsletter-strategic
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://newsletter:password@postgres:5432/newsletter_platform
+      - REDIS_URL=redis://redis:6379/0
+      - MESSAGE_QUEUE_URL=amqp://guest:guest@rabbitmq:5672/
+      - LOG_LEVEL=INFO
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+    command: uvicorn src.api.strategic_api:app --host 0.0.0.0 --port 8001 --reload
+
+  # Operational Orchestrator (Layer 2)
+  operational-orchestrator:
+    build:
+      context: .
+      dockerfile: docker/operational/Dockerfile
+    container_name: newsletter-operational
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://newsletter:password@postgres:5432/newsletter_platform
+      - REDIS_URL=redis://redis:6379/0
+      - MESSAGE_QUEUE_URL=amqp://guest:guest@rabbitmq:5672/
+      - TEMPORAL_HOST=temporal
+      - TEMPORAL_PORT=7233
+      - LOG_LEVEL=INFO
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+    command: uvicorn src.api.operational_api:app --host 0.0.0.0 --port 8002 --reload
+
+  # Execution Layer (Layer 3)
+  execution-layer:
+    build:
+      context: .
+      dockerfile: docker/execution/Dockerfile
+    container_name: newsletter-execution
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://newsletter:password@postgres:5432/newsletter_platform
+      - REDIS_URL=redis://redis:6379/0
+      - MESSAGE_QUEUE_URL=amqp://guest:guest@rabbitmq:5672/
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LOG_LEVEL=INFO
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+    command: uvicorn src.api.execution_api:app --host 0.0.0.0 --port 8003 --reload
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: .
+      dockerfile: docker/execution/Dockerfile
+    container_name: newsletter-celery-worker
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - DATABASE_URL=postgresql+asyncpg://newsletter:password@postgres:5432/newsletter_platform
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./src:/app/src
+    command: celery -A src.execution.celery_app worker --loglevel=info --concurrency=4
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: newsletter-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: newsletter-grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  temporal_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: newsletter-network
